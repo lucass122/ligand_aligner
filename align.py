@@ -5,7 +5,7 @@ from os.path import isfile, join
 from os import listdir
 
 
-files = [f for f in listdir(".") if isfile(join(".", f)) and ".pdb" in f and not ".pse" in f]
+files = [f for f in listdir("/pdbs") if isfile(join(".", f)) and ".pdb" in f and not ".pse" in f]
 
 #INPUT PDB NAME HERE
 pdb = "1IE4"
