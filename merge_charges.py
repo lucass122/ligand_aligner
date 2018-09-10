@@ -7,7 +7,7 @@ def get_pos(selection):
 		pos_sel.append([atom.coord[0], atom.coord[1], atom.coord[2]])
 	return pos_sel
 
-file_name = "session_iodine_minus1"
+file_name = "session_chlorine_minus1"
 
 
 
