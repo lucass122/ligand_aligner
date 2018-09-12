@@ -4,12 +4,14 @@ import pymol
 from os.path import isfile, join
 from os import listdir
 
+#Scan through pdb files in folder pdbs
+files = [f for f in listdir("pdbs/") if ".pdb" in f and not ".pse" in f]
 
-files = [f for f in listdir("/pdbs") if isfile(join(".", f)) and ".pdb" in f and not ".pse" in f]
 
-#INPUT PDB NAME HERE
-pdb = "1IE4"
-#INPUT WHICH HALOGEN BOND TO USE FOR ALIGNMENT IF THERE ARE MULTIPLE
+#INPUT PDB NAME HERE - do this for testing individual pdbs. you will have to change the code for loading the pdbs later on as well (for loop over files)
+#pdb = "3lqg"
+#INPUT WHICH HALOGEN BOND TO USE FOR ALIGNMENT IF THERE ARE MULTIPLE 
+#0 IS ALWAYS THE ONE WITH THE SHORTEST DISTANCE BETWEEN THE POLAR ATOM AND THE HALOGEN
 hal_bond = 0
 #INPUT SESSION NAME
 se ="session_chlorine_minus1_merged"
@@ -18,6 +20,7 @@ se ="session_chlorine_minus1_merged"
 
 """
 #Function that gets the position of a pymol selection and returns it as a python list
+@param selection: String containing selection of interest
 """
 
 def get_pos(selection):
@@ -28,11 +31,11 @@ def get_pos(selection):
 
 """
 Function that rotates a selection around the given angle until the reference atom (zero) lies on a plain.
+@param selection: Selection to rotate
+@param axis: Axis to rotate around
+@param angle: Angle to rotate around
+@param zero: Selection containing an atom to determine to direction of rotation. This atom will lie on a certain axis after rotation
 """
-
-
-# all backbone oxygen atoms have the name O --> select blub, n. O
-# all water oxygens have the name O --> select all waters with cmd.select("water", "resn hoh") and use the selection to exclude ...
 
 def rotate_sel(selection,axis,angle,zero):
 	position = get_pos(zero)
@@ -107,6 +110,9 @@ def rotate_sel(selection,axis,angle,zero):
 This function serves as a wrapper function for the rotate_sel function.
 It takes a selection to rotate and a reference atom as input. Then rotates around the 
 z axis until the x coordinate of ref_atom is 0.
+
+@param selection: Selection to rotate
+@param ref_atom: Atom which x coordinate should be 0
 """
 
 def zero_x(selection,ref_atom):
@@ -125,6 +131,9 @@ def zero_x(selection,ref_atom):
 This function serves as a wrapper function for the rotate_sel function.
 It takes a selection to rotate and a reference atom as input. Then rotates around the 
 x axis until the y coordinate of ref_atom is 0.
+
+@param selection: Selection to rotate
+@param ref_atom: Atom which y coordinate should be 0
 """
 
 def zero_y(selection,ref_atom):
@@ -143,6 +152,9 @@ def zero_y(selection,ref_atom):
 This function serves as a wrapper function for the rotate_sel function.
 It takes a selection to rotate and a reference atom as input. Then rotates around the 
 y axis until the z coordinate of ref_atom is 0.
+
+@param selection: Selection to rotate
+@param ref_atom: Atom which z coordinate should be 0
 """
 
 def zero_z(selection,ref_atom):
@@ -159,6 +171,9 @@ def zero_z(selection,ref_atom):
 
 """
 Function that aligns the selection to the negative x-axis of the origin.
+
+@param selection: Selection to align with the negative x-axis
+@param ref_atom: Atom used for calculating direction of rotation
 """
 
 def align_x_neg(selection,ref_atom):
@@ -173,6 +188,7 @@ def align_x_neg(selection,ref_atom):
 
 """
 Function to get position of polar atoms that form halogen bonds with ligand
+The return value is a list sorted by the distance between halogen and polar atom
 """
 def find_halogen_bonds():
 	halogen_bonds = []
@@ -206,15 +222,15 @@ def find_halogen_bonds():
 			current_angle = cmd.angle("current_angle", "current_neighbor", "current_halogen", "current_polar")
 			print(current_distance,current_angle)
 			if (current_angle >= 140) and (current_distance <= 5.0):
-				print current_distance, current_angle, pol.name, pol.resn, pol.resi, pol.id
-				halogen_bonds.append((pol.resn,pol.resi,pol.id))
+				halogen_bonds.append((pol.resn,pol.resi,pol.id,current_distance,current_angle))
+				#Append fitting halogen bonds to list
 				
 
 			cmd.delete("current_angle")
 			cmd.delete("current_distance")
 			
 			
-
+	#Clear up selections
 	cmd.delete("current_halogen")
 	cmd.delete("current_neighbor")
 	cmd.delete("water")
@@ -222,12 +238,23 @@ def find_halogen_bonds():
 	cmd.delete("current_polar")
 	cmd.delete("current_surroundings")
 	cmd.delete("bindingsite1")
+
+	#Sort the list by distance
+	halogen_bonds = sorted(halogen_bonds, key=lambda x: x[3])
+
 	return halogen_bonds
 
+"""
+Function that performs the necessary rotations to align a selection with a molecule. It uses the angles computed by aligning pseudo atoms with
+a selection.
+
+@param selection: selection to align
+@param center: Atom which the selection is translated to. 
+@param angles: Angles that have to be computed by aligning pseudoatoms to the selection
+"""
+
 def align_ligand(selection,center,angles):
-	print(center)
 	pos_halligand = get_pos(center)
-	print(pos_halligand)
 	translation_vector = pos_halligand
 
 	cmd.rotate("x",-angles[3],selection,0,0,origin=[0,0,0])
@@ -238,31 +265,36 @@ def align_ligand(selection,center,angles):
 	cmd.translate([translation_vector[0][0],translation_vector[0][1],translation_vector[0][2]],selection,-1,0)
 	
 	
+"""
+This calls reinitalize function to reset the screen after each iteration, loads important molecules as well as basic selections
+"""
 def init():
 	cmd.reinitialize()
 	#LOAD FILES AND MAKE THE NECESSARY SELECTIONS FOR ALIGNMENT
-	cmd.load("session_chlorine_minus1_merged.pse")
+	cmd.load("pses/session_chlorine_minus1_merged.pse")
 	cmd.do("run axes.py")
 	cmd.do("run center_of_mass.py")
 	#cmd.load("geometry_complex_Cl.mol")
 	cmd.select("circ_complex","organic")
 	
-	cmd.fetch(pdb)
+	cmd.fetch("pdbs/"+pdb)
 	cmd.select("water", "resn hoh")
 	#select ligand and bindingsite
 	cmd.select("ligand","organic and not circ_complex")
 	cmd.select("chain_a","chain a")
 	cmd.select("ligand_a", "ligand and chain_a")
 
+
+#START OF SCRIPT MAIN BODY
+
+
+#for loop over all pdb files in pdbs folder
 for file in files:
 	pdb = file[0:4]
+
 	print "Current File: " + str(pdb)
 	halligands = []
-
-
-
 	init()
-
 	cmd.select("halligands", "ligand and (name I* or name Br* or name Cl*)")
 
 	for halligand in cmd.get_model("halligands").atom:
@@ -271,10 +303,16 @@ for file in files:
 	c_hal=0
 	for halligand in halligands:
 		init()
-		cmd.select("halligand", "id " +str(halligand)+" and ligand and (name I* or name Br* or name Cl*)")
+
+		cmd.select("halligand", "id "+ str(halligand) +  " and ligand and (name I* or name Br* or name Cl*)")
 		cmd.select("hal", "(e. Cl or e. Br or e. I) and (halligand expand 5)") 
+
 		#find the important bonds for the alignment
 		hal_bonds = find_halogen_bonds()
+
+
+
+
 		if len(hal_bonds) > 0:
 			cmd.select("bindingsite", "halligand expand 5.0")	# expand selection by 5 angstrom, extend = extend along bonds
 			cmd.select("halcomplex", "first circ_complex and (name I* or name Br* or name Cl*)")
@@ -306,7 +344,7 @@ for file in files:
 				cmd.select("back_n","first bound_to back_c")
 
 			cmd.select("ligand_circ","br. halligand")
-			cmd.select("ligand_back","br. back_o")
+			cmd.select("ligand_back","br. back_c")
 
 			#select atoms of halogen structure of complex
 			cmd.select("circ_complex","circ_complex_only")
@@ -326,7 +364,7 @@ for file in files:
 			pos_halcomplex = np.array(pos_halcomplex)
 
 			cmd.select ("c2complex", "first bound_to cicomplex and name c*")
-			cmd.select ("c2ligand", "first bound_to ciligand and name c*" )
+			cmd.select ("c2ligand", "first not halligand and bound_to ciligand" )
 			translation_vector1 = -pos_halcomplex
 
 			#translate molecule from mol file to 0,0,0
@@ -390,24 +428,17 @@ for file in files:
 			angles_back = align_x_neg("pseudo_back","pseudo_back_c")
 			angles_back.append(zero_y("pseudo_back","pseudo_back_n"))
 
-
+			#align backbone of ligand to backbone of complex
 			align_ligand("comp_back","back_o",angles_back)
 
-			cmd.zoom("comp_back")
 
-			selections = cmd.get_names("all")
+			#ALIGN PSEUDOATOMS WITH ENERGIES TO THE BINDING POCKET
 
-			c=0
-
-			#FINALLY ACCESS SEPARATED SELECTIONS TO ALIGN PSEUDOATOMS WITH ENERGIES TO THE BINDING POCKET
-
-			#align backbone of ligand to backbone of complex
 			align_ligand("charges_backbone","back_o",angles_back)
 			cmd.translate([translation_vector1[0][0],translation_vector1[0][1],translation_vector1[0][2]],"charges_circle",-1,0)
 			cmd.rotate("z",180,"charges_circle",0,0,origin=[0,0,0])
 			cmd.rotate("x",180,"charges_circle",0,0,origin=[0,0,0])
 
-			#align halogen structure of ligand to halogen structure of complex
 			align_ligand("charges_circle","halligand",angles_circ)
 			cmd.select("charged_aas","resn glu+asp+arg+lys+his")
 
@@ -415,13 +446,10 @@ for file in files:
 
 
 			cmd.hide("lines")
-
 			cmd.show("sticks","ligand_circ")
 			cmd.show("sticks","ligand_back")
-
-
 			
-			cmd.hide("sticks","circ_complex")
+  			cmd.hide("sticks","circ_complex")
 			cmd.hide("lines","circ_complex")
 			cmd.hide("lines","ligand")
 			cmd.delete("back_*")
@@ -441,14 +469,17 @@ for file in files:
 			cmd.delete("ligand")
 			cmd.hide("sticks","comp_back")
 			cmd.hide("lines","comp_back")
-			cmd.delete("complex")
+			#cmd.delete("complex")
 			cmd.hide("nonbonded")
 			cmd.show("nonbonded","charges_circle")
 			cmd.show("nonbonded","charges_backbone")
 			cmd.delete("charges_circ")
 			cmd.delete("charges_back")
-			
+			cmd.zoom("charges_circle",2)
+			cmd.hide("lines","complex")
+			cmd.bg_color("white")
 
+			
 			#FIND CHARGED RESIDUES IN CHARGE CLOUD
 			cmd.select("charged_aas","resn glu+asp+arg+lys+his")
 			cmd.delete("chain_a")
@@ -461,39 +492,48 @@ for file in files:
 				atom.name == "HZ1" or atom.name == "HH12" or atom.name == "NZ" or \
 				atom.name == "NE2" or (atom.name == "N" and atom.resn == "HIS") or atom.name =="OE1" or \
 				atom.name == "OE2" or atom.name == "NH2" or atom.name == "NH1":
-					dist = cmd.get_distance("resi "+str(atom.resi)+" and id "+str(atom.id),"cen_charges_circle")
+					dist1 = cmd.get_distance("resi "+str(atom.resi)+" and id "+str(atom.id),"cen_charges_circle")
+					dist2 = cmd.get_distance("resi "+str(atom.resi)+" and id "+str(atom.id),"cen_charges_backbone")
 					#print(atom.resn,atom.resi,dist)
-					if dist < 8:
-						aas.append((atom.resn,atom.resi))
+					if dist1 < 8:
+						aas.append((atom.resn,atom.resi,"Halogen complex cloud"))
+					if dist2 < 8:
+						aas.append((atom.resn,atom.resi,"Backbone cloud"))
 						
-
-			for atom in cmd.get_model("charged_aas").atom:
- 				if atom.name == "OD1" or atom.name == "OD2" or (atom.resn == "HIS" and atom.name =="HB2") or \
-				atom.name == "HZ1" or atom.name == "HH12" or atom.name == "NZ" or \
-				atom.name == "NE2" or (atom.name == "N" and atom.resn == "HIS") or atom.name =="OE1" or \
-				atom.name == "OE2" or atom.name == "NH2" or atom.name == "NH1":
-					dist = cmd.get_distance("resi "+str(atom.resi)+" and id "+str(atom.id),"cen_charges_backbone")
-					#print(atom.resn,atom.resi,dist)
-					if dist < 8:
-						aas.append((atom.resn,atom.resi))
-
-
-
 			cmd.delete("cen_charges*")
 
 			aas = set(aas)
 			print("Charged residues near the point cloud: ")
 			print(aas)
 			
+
+			filename =   str(se)+"_"+str(pdb)+"_halbond"+str(hal_bond)+"_halogen_"+str(c_hal)
+			#Save session information in separate text file
+
+			with open("session_info/"+filename+".txt","w") as file: 
+				file.write("File with charge cloud: "+str(se)+ "\n")
+				file.write("Used pdb: "+str(pdb)+ "\n")
+				file.write("Index of halogen bond used for aligning: "+str(hal_bond)+ "\n")
+				file.write("Index of halogen used for aligning: "+str(c_hal)+ "\n")
+				file.write("Atom ID of halogen used for aligning: "+str(halligand)+ "\n")
+				file.write("resn and resi of atom polar atom in halogen bond: "+ str(hal_bonds[hal_bond][0]) + str(hal_bonds[hal_bond][1])+ "\n")
+				file.write("List of residues in point cloud: "+str(aas)+ "\n")
+
+
+
+
 			for res in aas:
 				cmd.select(str(res[0])+"_"+res[1],"chain a and resn "+res[0]+" and resi "+res[1])
 				cmd.show("lines",str(res[0])+"_"+res[1])
 
 			if len(aas) > 0:
-				cmd.save(str(se)+"_"+str(pdb)+"_halbond"+str(hal_bond)+"_halogen_"+str(c_hal)+".pse")
+				cmd.save("pses/"+filename +".pse")
 			c_hal+=1
-		break
-	break
+		
+	
+
+	
+	
 
 		
 	
