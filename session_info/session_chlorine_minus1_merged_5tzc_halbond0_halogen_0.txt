@@ -4,4 +4,4 @@ Index of halogen bond used for aligning: 0
 Index of halogen used for aligning: 0
 Atom ID of halogen used for aligning: 11217
 resn and resi of atom polar atom in halogen bond: TYR827
-List of residues in point cloud: set([('ASP', '769', 'Halogen complex cloud')])
+List of residues in point cloud: set([('ASP', '769', 'Backbone cloud', 'Negative Effect')])

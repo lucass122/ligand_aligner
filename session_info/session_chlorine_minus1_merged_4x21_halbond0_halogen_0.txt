@@ -4,4 +4,4 @@ Index of halogen bond used for aligning: 0
 Index of halogen used for aligning: 0
 Atom ID of halogen used for aligning: 5214
 resn and resi of atom polar atom in halogen bond: MET146
-List of residues in point cloud: set([('ASP', '150', 'Halogen complex cloud'), ('ARG', '88', 'Backbone cloud'), ('GLU', '147', 'Backbone cloud')])
+List of residues in point cloud: set([('GLU', '147', 'Halogen complex cloud', 'Negative Effect'), ('ARG', '88', 'Halogen complex cloud', 'Neutral Effect'), ('ASP', '150', 'Backbone cloud', 'Negative Effect')])

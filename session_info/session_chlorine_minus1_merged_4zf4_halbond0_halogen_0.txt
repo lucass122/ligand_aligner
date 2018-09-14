@@ -4,4 +4,4 @@ Index of halogen bond used for aligning: 0
 Index of halogen used for aligning: 0
 Atom ID of halogen used for aligning: 130
 resn and resi of atom polar atom in halogen bond: THR155
-List of residues in point cloud: set([('ARG', '46', 'Halogen complex cloud'), ('ASP', '98', 'Halogen complex cloud'), ('GLU', '172', 'Backbone cloud'), ('GLU', '172', 'Halogen complex cloud'), ('HIS', '131', 'Halogen complex cloud')])
+List of residues in point cloud: set([('GLU', '172', 'Backbone cloud', 'Negative Effect'), ('HIS', '131', 'Backbone cloud', 'Depends on pH value'), ('GLU', '172', 'Halogen complex cloud', 'Negative Effect'), ('ASP', '98', 'Backbone cloud', 'Negative Effect'), ('ARG', '46', 'Backbone cloud', 'Neutral Effect')])

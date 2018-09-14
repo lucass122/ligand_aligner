@@ -1,0 +1,7 @@
+File with charge cloud: session_chlorine_minus1_merged
+Used pdb: 3um5
+Index of halogen bond used for aligning: 0
+Index of halogen used for aligning: 0
+Atom ID of halogen used for aligning: 9075
+resn and resi of atom polar atom in halogen bond: SER111
+List of residues in point cloud: set([('LYS', '117', 'Halogen complex cloud', 'Neutral Effect'), ('GLU', '110', 'Halogen complex cloud', 'Negative Effect'), ('ASP', '54', 'Backbone cloud', 'Negative Effect')])

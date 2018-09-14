@@ -9,13 +9,18 @@ files = [f for f in listdir("pdbs/") if ".pdb" in f and not ".pse" in f]
 
 
 #INPUT PDB NAME HERE - do this for testing individual pdbs. you will have to change the code for loading the pdbs later on as well (for loop over files)
-#pdb = "3lqg"
+pdb = "5osw"
 #INPUT WHICH HALOGEN BOND TO USE FOR ALIGNMENT IF THERE ARE MULTIPLE 
 #0 IS ALWAYS THE ONE WITH THE SHORTEST DISTANCE BETWEEN THE POLAR ATOM AND THE HALOGEN
 hal_bond = 0
 #INPUT SESSION NAME
+
 se ="session_chlorine_minus1_merged"
 
+if "minus1" in se:
+	se_charge = "negative"
+if "plus1" in se:
+	se_charge = "positive"
 
 
 """
@@ -264,7 +269,45 @@ def align_ligand(selection,center,angles):
 
 	cmd.translate([translation_vector[0][0],translation_vector[0][1],translation_vector[0][2]],selection,-1,0)
 	
-	
+"""
+Function that determines the effect of a charged residue on the halogen bond.
+@param atom: model containing atom of charged residue
+"""
+def rate_residues(atom):
+	cmd.select("charges_near_res","not resn " + str(atom.resn)+ " and(resn "+str(atom.resn)+" and id "+str(atom.id)+ " expand 0.5)")
+	cmd.iterate('charges_near_res', 'pymol.color_list.append(color)')
+	print(cmd.get_color_tuple(pymol.color_list[0]))
+	pos = False
+	neg = False
+	depends = False
+	for color in pymol.color_list:
+		rgb = cmd.get_color_tuple(color)
+		if rgb[0] > 0.7 or rgb[2] > 0.7:
+			if atom.resn == "LYS" or atom.resn == "ARG":
+				if se_charge == "negative":
+					pos = True
+				else:
+					pos = False
+			if atom.resn == "GLU" or atom.resn == "ASP":
+				if se_charge == "positive":
+					neg = True
+				else:
+					neg = False
+			if atom.resn == "HIS":
+				depends = True
+
+	if pos:	
+		effect = "Positive Effect"
+	if neg:
+		effect = "Negative Effect"
+	if depends:
+		effect = "Depends on pH value"
+	if not pos and not neg and not depends:
+		effect = "Neutral Effect"
+	return effect
+
+
+
 """
 This calls reinitalize function to reset the screen after each iteration, loads important molecules as well as basic selections
 """
@@ -309,10 +352,10 @@ for file in files:
 
 		#find the important bonds for the alignment
 		hal_bonds = find_halogen_bonds()
-
-
-
-
+		#check if there are no halogen bonds in pdb and go to next file if it is the case
+		if len(hal_bonds) == 0:
+			break
+			continue
 		if len(hal_bonds) > 0:
 			cmd.select("bindingsite", "halligand expand 5.0")	# expand selection by 5 angstrom, extend = extend along bonds
 			cmd.select("halcomplex", "first circ_complex and (name I* or name Br* or name Cl*)")
@@ -329,15 +372,17 @@ for file in files:
 			#select atoms of ligand backbone for alignment
 			cmd.select("back_polar","resi "+str(hal_bonds[0][1])+" and id "+ str(hal_bonds[0][2]))
 			model_back_polar = cmd.get_model("back_polar").atom
+			#Case 1: the polar atom is a sulphur
 			if "S" in model_back_polar[0].name:
 				cmd.select("back_o","resi "+str(hal_bonds[hal_bond][1])+" and id "+ str(hal_bonds[hal_bond][2]))
 				cmd.select("back_c","first bound_to back_o")
 				cmd.select("back_n","last bound_to back_o")
+			#Case 2: the polar atom is an oxygen
 			if "O" in model_back_polar[0].name:
 				cmd.select("back_o","resi "+str(hal_bonds[hal_bond][1])+" and id "+ str(hal_bonds[hal_bond][2]))
 				cmd.select("back_c","bound_to back_o")
 				cmd.select("back_n","first bound_to back_c")
-
+			#Case 3: the polar atom is a nitrogen
 			if "N" in model_back_polar[0].name:
 				cmd.select("back_o","resi "+str(hal_bonds[hal_bond][1])+" and id "+ str(hal_bonds[hal_bond][2]))
 				cmd.select("back_c","first bound_to back_o")
@@ -352,13 +397,12 @@ for file in files:
 			cmd.select ("cicomplex", "name C* and bound_to halcomplex") 
 
 			translation_vector = 0
+			#get positions of ligand and complex atoms previously selected
 			pos_halcomplex = get_pos("halcomplex")
 			pos_halligand =get_pos("halligand")
 			pos_cicomplex = get_pos("cicomplex")
 			pos_ciligand = get_pos("ciligand")
-
-
-			#get positions of ligand and complex atoms previously selected
+			#turn position into numpy array for easier calculations
 			pos_cicomplex = np.array(pos_cicomplex)
 			pos_ciligand = np.array(pos_ciligand)
 			pos_halcomplex = np.array(pos_halcomplex)
@@ -375,13 +419,14 @@ for file in files:
 			pos_halcomplex = get_pos("halcomplex")
 			pos_halligand = np.array(pos_halligand)
 
-			#add pseudoatom on x axis to measure angle for rotation around y axis
-
+			#rotate the complex to fit the negative x axis
 			cmd.rotate("z",180,"circ_complex",0,0,origin=[0,0,0])
 			cmd.rotate("x",180,"circ_complex",0,0,origin=[0,0,0])
-
+			#do the same for the backbone of the complex
 			cmd.rotate("x",180,"comp_back",0,0,origin=[0,0,0])
 			pos_c2ligand = get_pos("c2ligand")
+
+			#create pseudoatoms of the ligand for calculating rotation angles without moving the actual ligand
 			cmd.pseudoatom("pseudo_ciligand",pos=[pos_ciligand[0][0],pos_ciligand[0][1],pos_ciligand[0][2]])
 			cmd.pseudoatom("pseudo_c2ligand",pos=[pos_c2ligand[0][0],pos_c2ligand[0][1],pos_c2ligand[0][2]])
 			cmd.pseudoatom("pseudo_halligand",pos=[pos_halligand[0][0],pos_halligand[0][1],pos_halligand[0][2]])
@@ -396,13 +441,11 @@ for file in files:
 			cmd.select("pseudo_back","pseudo_back_o or pseudo_back_c or pseudo_back_n")
 
 			#TRANSLATE PSEUDO BACK TO ORIGIN TO GET ROTATION ANGLES FOR BACKBONE
-
 			pos_pseudo_back = get_pos("pseudo_back_o")
 			pos_pseudo_back = np.array(pos_pseudo_back)
 
 
 			translation_back=-pos_pseudo_back
-
 			cmd.translate([translation_back[0][0],translation_back[0][1],translation_back[0][2]],"pseudo_back",-1,0)
 
 
@@ -412,19 +455,14 @@ for file in files:
 			pos_pseudo_ligand = get_pos("pseudo_halligand")
 			pos_pseudo_ligand = np.array(pos_pseudo_ligand)
 
-
-
-
 			translation_vector = -pos_pseudo_ligand
 			cmd.translate([translation_vector[0][0],translation_vector[0][1],translation_vector[0][2]],"pseudo_ligand",-1,0)
-
+			#get the rotation angles for the halogen complex and rotate pseudo ligand
 			angles_circ = align_x_neg("pseudo_ligand","pseudo_ciligand")
 			angles_circ.append(zero_y("pseudo_ligand","pseudo_c2ligand"))
 			align_ligand("circ_complex","halligand",angles_circ)
 
-			#rotate pseudo backbone
-
-
+			#get the rotation angles for the ligand backbone and rotate pseudo backbone
 			angles_back = align_x_neg("pseudo_back","pseudo_back_c")
 			angles_back.append(zero_y("pseudo_back","pseudo_back_n"))
 
@@ -433,22 +471,20 @@ for file in files:
 
 
 			#ALIGN PSEUDOATOMS WITH ENERGIES TO THE BINDING POCKET
-
+			#align the backbone charges
 			align_ligand("charges_backbone","back_o",angles_back)
 			cmd.translate([translation_vector1[0][0],translation_vector1[0][1],translation_vector1[0][2]],"charges_circle",-1,0)
+			#align the charges around the halogen complex - NOTE: first rotate the charges like it has been done with the pseudoatoms earlier
 			cmd.rotate("z",180,"charges_circle",0,0,origin=[0,0,0])
 			cmd.rotate("x",180,"charges_circle",0,0,origin=[0,0,0])
 
 			align_ligand("charges_circle","halligand",angles_circ)
 			cmd.select("charged_aas","resn glu+asp+arg+lys+his")
 
-			#clean up selection no longer needed 
-
-
+			#clean up selections no longer needed 
 			cmd.hide("lines")
 			cmd.show("sticks","ligand_circ")
 			cmd.show("sticks","ligand_back")
-			
   			cmd.hide("sticks","circ_complex")
 			cmd.hide("lines","circ_complex")
 			cmd.hide("lines","ligand")
@@ -464,12 +500,10 @@ for file in files:
 			cmd.delete("halligand")
 			cmd.delete("c*ligand")
 			cmd.hide("cgo","axes")
-			#cmd.delete("comp_back")
 			cmd.delete("halcomplex")
 			cmd.delete("ligand")
 			cmd.hide("sticks","comp_back")
 			cmd.hide("lines","comp_back")
-			#cmd.delete("complex")
 			cmd.hide("nonbonded")
 			cmd.show("nonbonded","charges_circle")
 			cmd.show("nonbonded","charges_backbone")
@@ -477,6 +511,7 @@ for file in files:
 			cmd.delete("charges_back")
 			cmd.zoom("charges_circle",2)
 			cmd.hide("lines","complex")
+			#set background color to white
 			cmd.bg_color("white")
 
 			
@@ -484,57 +519,74 @@ for file in files:
 			cmd.select("charged_aas","resn glu+asp+arg+lys+his")
 			cmd.delete("chain_a")
 			aas = []
+			#create pseudoatom for each point cloud representing each center of mass
 			com("charges_backbone",object="cen_charges_backbone")
 			com("charges_circle",object="cen_charges_circle")
-
+			#if there are no charged residues go to the next file
+			if len(cmd.get_model("charged_aas").atom) == 0:
+				break
+				continue
+			print()
+			#if len(cmd.get_model("charged_aas")) == 0:
+			#	print(cmd.get_model("charged_aas").atom)
+			#	continue
 			for atom in cmd.get_model("charged_aas").atom:
 				if atom.name == "OD1" or atom.name == "OD2" or (atom.resn == "HIS" and atom.name =="HB2") or \
 				atom.name == "HZ1" or atom.name == "HH12" or atom.name == "NZ" or \
 				atom.name == "NE2" or (atom.name == "N" and atom.resn == "HIS") or atom.name =="OE1" or \
 				atom.name == "OE2" or atom.name == "NH2" or atom.name == "NH1":
-					dist1 = cmd.get_distance("resi "+str(atom.resi)+" and id "+str(atom.id),"cen_charges_circle")
-					dist2 = cmd.get_distance("resi "+str(atom.resi)+" and id "+str(atom.id),"cen_charges_backbone")
-					#print(atom.resn,atom.resi,dist)
+					try:
+						dist1 = cmd.get_distance("resi "+str(atom.resi)+" and id "+str(atom.id),"cen_charges_circle")
+						dist2 = cmd.get_distance("resi "+str(atom.resi)+" and id "+str(atom.id),"cen_charges_backbone")
+					except pymol.CmdException:
+							print("Couldn't fetch distance")
+							break
+							continue
 					if dist1 < 8:
-						aas.append((atom.resn,atom.resi,"Halogen complex cloud"))
-					if dist2 < 8:
-						aas.append((atom.resn,atom.resi,"Backbone cloud"))
-						
-			cmd.delete("cen_charges*")
+						#get the effect of the residue on the halogen bond
+						effect = rate_residues(atom)
+						aas.append((atom.resn,atom.resi,"Backbone cloud",effect))
 
+					if dist2 < 8:
+						#get the effect of the residue on the halogen bond
+						effect = rate_residues(atom)
+						aas.append((atom.resn,atom.resi,"Halogen complex cloud",effect))
+
+
+
+			#delete selections no longer necessary	
+			cmd.delete("cen_charges*")
+			cmd.delete("charges_near_res")
 			aas = set(aas)
 			print("Charged residues near the point cloud: ")
 			print(aas)
 			
 
 			filename =   str(se)+"_"+str(pdb)+"_halbond"+str(hal_bond)+"_halogen_"+str(c_hal)
-			#Save session information in separate text file
 
+			#Save session information in separate text file in session_info folder
 			with open("session_info/"+filename+".txt","w") as file: 
 				file.write("File with charge cloud: "+str(se)+ "\n")
 				file.write("Used pdb: "+str(pdb)+ "\n")
 				file.write("Index of halogen bond used for aligning: "+str(hal_bond)+ "\n")
 				file.write("Index of halogen used for aligning: "+str(c_hal)+ "\n")
 				file.write("Atom ID of halogen used for aligning: "+str(halligand)+ "\n")
-				file.write("resn and resi of atom polar atom in halogen bond: "+ str(hal_bonds[hal_bond][0]) + str(hal_bonds[hal_bond][1])+ "\n")
+				file.write("resn and resi of polar atom in halogen bond: "+ str(hal_bonds[hal_bond][0]) + str(hal_bonds[hal_bond][1])+ "\n")
 				file.write("List of residues in point cloud: "+str(aas)+ "\n")
 
 
 
-
+			#select residues in charge cloud and show them
 			for res in aas:
 				cmd.select(str(res[0])+"_"+res[1],"chain a and resn "+res[0]+" and resi "+res[1])
 				cmd.show("lines",str(res[0])+"_"+res[1])
 
+
+
 			if len(aas) > 0:
 				cmd.save("pses/"+filename +".pse")
 			c_hal+=1
-		
-	
+			#END OF SCRIPT
 
-	
-	
 
-		
-	
-		
+

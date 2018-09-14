@@ -4,4 +4,4 @@ Index of halogen bond used for aligning: 0
 Index of halogen used for aligning: 0
 Atom ID of halogen used for aligning: 4607
 resn and resi of atom polar atom in halogen bond: TYR612
-List of residues in point cloud: set([('HIS', '613', 'Backbone cloud'), ('GLU', '785', 'Backbone cloud'), ('HIS', '617', 'Backbone cloud'), ('ASP', '654', 'Backbone cloud'), ('HIS', '657', 'Backbone cloud')])
+List of residues in point cloud: set([('GLU', '785', 'Halogen complex cloud', 'Negative Effect'), ('HIS', '617', 'Halogen complex cloud', 'Depends on pH value'), ('HIS', '613', 'Halogen complex cloud', 'Depends on pH value'), ('HIS', '657', 'Halogen complex cloud', 'Depends on pH value'), ('ASP', '654', 'Halogen complex cloud', 'Negative Effect')])
