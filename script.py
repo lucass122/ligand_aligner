@@ -61,7 +61,7 @@ for file in files:
 
 	# visualizations
 	cmd.hide("lines")
-	cmd.hide("nonbonded")	# hide all nonbonded atomes, i.e. oxygen of water or ions
+	cmd.hide("nonbonded")	# hide all nonbonded atoms, i.e. oxygen of water or ions
 	cmd.show("sticks", "ligand")
 	cmd.show("lines", "bindingsite")
 	cmd.show("nb_spheres", "water_bs")	# nb_spheres = non bonded spheres
